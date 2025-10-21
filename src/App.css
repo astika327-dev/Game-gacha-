@@ -1,0 +1,84 @@
+/* Reset CSS Dasar & Gaya Global */
+body {
+  font-family: 'Arial', sans-serif;
+  background: linear-gradient(45deg, #ff8c00, #ff00ff);
+  color: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  margin: 0;
+}
+
+/* Wadah Aplikasi Utama */
+.app-container {
+  background-color: rgba(0, 0, 0, 0.5);
+  padding: 2rem;
+  border-radius: 20px;
+  text-align: center;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  border: 2px solid #fff;
+}
+
+h1 {
+  font-size: 3rem;
+  text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+}
+
+/* Mesin Slot & Gulungan */
+.slot-machine {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin: 2rem 0;
+}
+
+.reel {
+  width: 100px;
+  height: 100px;
+  background-color: #fff;
+  color: #333;
+  font-size: 3rem;
+  font-weight: bold;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+  border: 5px solid #ffdf00;
+}
+
+/* Tombol Putar */
+.spin-button {
+  background-color: #00ff7f; /* Hijau Terang */
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: bold;
+  padding: 1rem 2rem;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background-color 0.3s, transform 0.1s;
+  box-shadow: 0 5px 15px rgba(0, 255, 127, 0.4);
+}
+
+.spin-button:hover {
+  background-color: #00e673;
+}
+
+.spin-button:active {
+  transform: scale(0.95);
+}
+
+.spin-button:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Tampilan Hadiah */
+.reward-display {
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+  min-height: 2rem;
+}
