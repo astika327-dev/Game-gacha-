@@ -11,6 +11,8 @@
     "test": "vitest"
   },
   "dependencies": {
+    "firebase": "^12.4.0",
+    "firebase-admin": "^13.5.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

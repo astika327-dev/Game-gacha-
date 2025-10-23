@@ -1,109 +1,126 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { playSpinSound, playWinSound } from './utils/audio';
+import { auth, db } from './lib/firebase'; // Assuming you have a firebase config file
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { doc, onSnapshot } from 'firebase/firestore';
 import './App.css';
 
-// === Konfigurasi Game ===
-const rewards: { [key: string]: number } = {
-  '🍒': 10,
-  '🍋': 20,
-  '🍊': 30,
-  '🍇': 50,
-  '💎': 100,
-  '7️⃣': 250,
-};
-const symbols = Object.keys(rewards);
-
+// Game configuration (Display only)
+const symbols = ['🍒', '🍋', '🍊', '🍇', '💎', '7️⃣'];
 const SPIN_COST = 10;
-const INITIAL_COINS = 500;
-const MAX_BET = 50; // Taruhan maksimum baru
+const MAX_BET = 50;
 
 function App() {
   const [reels, setReels] = useState<string[]>(['🍒', '🍋', '🍊']);
-  const [coins, setCoins] = useState(INITIAL_COINS);
-  const [message, setMessage] = useState('Selamat datang di U2 Gacha Slot!');
+  const [coins, setCoins] = useState(0); // Coins will be loaded from Firestore
+  const [message, setMessage] = useState('Welcome to Fruit Frenzy Slots!');
   const [isSpinning, setIsSpinning] = useState(false);
   const [currentBet, setCurrentBet] = useState(SPIN_COST);
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const spinReels = () => {
-    // Logika ini tetap sama, menghasilkan simbol acak
-    return [
-      symbols[Math.floor(Math.random() * symbols.length)],
-      symbols[Math.floor(Math.random() * symbols.length)],
-      symbols[Math.floor(Math.random() * symbols.length)],
-    ];
-  };
+  // Listen for authentication state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
-  const calculateWinnings = (spunReels: string[]): number => {
-    // Implementasi dari GDD: Kemenangan jika ada dua atau lebih simbol yang sama
-    const counts: { [key: string]: number } = {};
-    for (const symbol of spunReels) {
-      counts[symbol] = (counts[symbol] || 0) + 1;
+  // Listen for changes to the user's coin balance in Firestore
+  useEffect(() => {
+    if (user) {
+      const userDocRef = doc(db, 'users', user.uid);
+      const unsubscribe = onSnapshot(userDocRef, (doc) => {
+        if (doc.exists()) {
+          setCoins(doc.data().coins);
+        }
+      });
+      return () => unsubscribe();
     }
+  }, [user]);
 
-    let prize = 0;
-    for (const symbol in counts) {
-      if (counts[symbol] >= 2) {
-        // Hadiah = (Nilai Simbol * Jumlah Kemunculan) * (Taruhan / Biaya Putaran Dasar)
-        prize += rewards[symbol] * counts[symbol] * (currentBet / SPIN_COST);
-      }
-    }
-    return prize;
-  };
-
-  const handleSpin = () => {
-    if (coins < currentBet || isSpinning) return;
+  const handleSpin = async () => {
+    if (coins < currentBet || isSpinning || !user) return;
 
     playSpinSound();
     setIsSpinning(true);
-    setCoins(prev => prev - currentBet);
     setMessage('');
 
-    // Animasi putaran dummy
     const spinInterval = setInterval(() => {
-      setReels(spinReels());
+      const newReels = [
+        symbols[Math.floor(Math.random() * symbols.length)],
+        symbols[Math.floor(Math.random() * symbols.length)],
+        symbols[Math.floor(Math.random() * symbols.length)],
+      ];
+      setReels(newReels);
     }, 100);
 
-    setTimeout(() => {
+    try {
+      const idToken = await user.getIdToken();
+      const response = await fetch('/api/spin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ bet: currentBet }),
+      });
+
       clearInterval(spinInterval);
-      const finalReels = spinReels();
-      setReels(finalReels);
 
-      const prize = calculateWinnings(finalReels);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Server error');
+      }
 
-      if (prize > 0) {
-        setCoins(prev => prev + prize);
-        setMessage(`Anda memenangkan ${prize.toFixed(0)} koin!`);
+      const data = await response.json();
+      setReels(data.reels);
+
+      if (data.prize > 0) {
+        setMessage(`You won ${data.prize.toFixed(0)} coins!`);
         playWinSound();
       } else {
-        setMessage('Coba lagi!');
+        setMessage('Try again!');
       }
+      // Coin balance will be updated automatically by the Firestore listener
+    } catch (error: any) {
+      clearInterval(spinInterval);
+      setMessage(`Error: ${error.message}`);
+      console.error('Spin error:', error);
+    } finally {
       setIsSpinning(false);
-    }, 1000); // Durasi putaran
+    }
   };
 
   const handleBetMax = () => {
     if (isSpinning) return;
     setCurrentBet(MAX_BET);
-    console.log(`Taruhan diatur ke maksimum: ${MAX_BET}`);
-  }
+  };
 
   const handleCollect = () => {
     if (isSpinning) return;
-    // Logika ini masih berupa placeholder, tetapi memberikan umpan balik
-    setMessage(`Anda telah mengumpulkan total ${coins} koin. Sampai jumpa!`);
-    // Bisa juga menonaktifkan permainan atau mereset saldo di sini
+    setMessage(`You have collected a total of ${coins} coins. See you next time!`);
+  };
+
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
+  if (!user) {
+    return <div>Please sign in to play.</div>; // Replace with a proper login component
   }
 
   return (
     <div id="game-container">
       <header className="game-header">
-        <h1>U2 Gacha Slot</h1>
+        <h1>Fruit Frenzy Slots</h1>
         <div className="balance-display">
-          <span>Koin:</span>
+          <span>Coins:</span>
           <span className="balance-amount">{coins}</span>
         </div>
       </header>
-
       <main className="slot-area">
         <div className="slot-frame">
           {reels.map((symbol, index) => (
@@ -114,13 +131,12 @@ function App() {
         </div>
         <div className="message-display">{message}</div>
       </main>
-
       <footer className="game-controls">
-        <button className="control-button" onClick={handleBetMax} disabled={isSpinning}>
+        <button className="control-button" onClick={handleBetMax} disabled={isSpinning || coins < MAX_BET}>
           BET MAX
         </button>
-        <button className="control-button spin" onClick={handleSpin} disabled={isSpinning}>
-          {isSpinning ? 'BERPUTAR...' : `SPIN (${currentBet})`}
+        <button className="control-button spin" onClick={handleSpin} disabled={isSpinning || coins < currentBet}>
+          {isSpinning ? 'SPINNING...' : `SPIN (${currentBet})`}
         </button>
         <button className="control-button" onClick={handleCollect} disabled={isSpinning}>
           COLLECT
